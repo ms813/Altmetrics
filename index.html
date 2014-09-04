@@ -1,0 +1,603 @@
+<!doctype html>
+<html>
+	<head>
+
+		<link rel="stylesheet" type="text/css" href="spinner.css">	
+		<link rel="stylesheet" type="text/css" href="style.css">
+		<style type="text/css">
+	        .axis path,
+	        .axis line {
+	            fill: none;
+	            stroke: black;
+	            shape-rendering: crispEdges;
+	        }
+
+	        .axis text {
+	            font-family: sans-serif;
+	            font-size: 11px;	            
+	        }
+	    </style>
+
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>	
+		<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>	
+		<script src="http://d3js.org/d3.v3.min.js"></script>	
+		<script src='JournalList.js'></script>
+		<script src='JournalListHandler.js'></script>
+		<script src='AmAPI.js'></script>		
+		<script src='JnlBreakdownChart.js'></script>
+		<script src='CitedByChart.js'></script>
+		<script src="lib/mustache.js"></script>
+		<script id="topArtTemplate" type='text/html'>
+			{{#publisher}}
+			<div class='publisherTopArts'>
+				<h3 class='publisherName'>{{publisher}}</h3>
+				{{#journals}}
+				<span class='jnlTopArts'>
+				<h4 class='jnlName'>{{journal.Journal full name}}</h4>					
+				{{#topArticles}}
+					<h4 class='subheading toggleNext toggleDown'>This week</h4>
+					<ul hidden>
+						{{#1w}}
+							<li class='topArticle'>
+								<a class='altmetricImg' href={{details_url}}><img src='{{images.small}}'></a>
+								<span class='articleInfo'>
+									<a class='articleUrl' href={{url}} target="_blank">{{title}}</a>
+									<span class='subInfo'>
+										<span>Journal: {{journal.Journal full name}}</span>
+										<span>Score in last week: {{history.1w}}</span>
+									</span>
+								</span>
+							</li>
+						{{/1w}}
+					</ul>
+					<h4 class='subheading toggleNext toggleDown'>This month</h4>
+					<ul hidden>
+						{{#1m}}
+							<li class='topArticle'>
+								<a class='altmetricImg' href={{details_url}}><img src='{{images.small}}'></a>
+								<span class='articleInfo'>
+									<a class='articleUrl' href={{url}} target="_blank">{{title}}</a>
+									<span class='subInfo'>
+										<span>Journal: {{journal.Journal full name}}</span>
+										<span>Score in last month: {{history.1m}}</span>
+									</span>
+								</span>
+							</li>
+						{{/1m}}
+					</ul>
+					<h4 class='subheading toggleNext toggleDown'>This Quarter</h4>
+					<ul hidden>
+						{{#3m}}
+							<li class='topArticle'>
+								<a class='altmetricImg' href={{details_url}}><img src='{{images.small}}'></a>
+								<span class='articleInfo'>
+									<a class='articleUrl' href={{url}} target="_blank">{{title}}</a>
+									<span class='subInfo'>
+										<span>Journal: {{journal.Journal full name}}</span>
+										<span>Score in last three months: {{history.3m}}</span>
+									</span>
+								</span>
+							</li>
+						{{/3m}}
+					</ul>
+					<h4 class='subheading toggleNext toggleDown'>This year</h4>
+					<ul hidden>
+						{{#1y}}
+							<li class='topArticle'>
+								<a class='altmetricImg' href={{details_url}}><img src='{{images.small}}'></a>
+								<span class='articleInfo'>
+									<a class='articleUrl' href={{url}} target="_blank">{{title}}</a>
+									<span class='subInfo'>
+										<span>Journal: {{journal.Journal full name}}</span>
+										<span>Score in last year: {{history.1y}}</span>
+									</span>
+								</span>
+							</li>
+						{{/1y}}
+					</ul>
+
+				{{/topArticles}}		
+				</span>	
+				{{/journals}}
+				</div>
+			{{/publisher}}
+		</script>
+
+		<script id='summaryTemplate' type='text/html'>
+		{{#publisher}}
+			<span>
+				<h4 class='publisherName'>{{publisher}}</h4>
+				<div>Average score this week: {{averageScore.week}}</div>
+				<div>Average score this month: {{averageScore.month}}</div>
+				<div>Average score this quarter: {{averageScore.quarter}}</div>
+				<div>Average score this year: {{averageScore.year}}</div>
+			</span>
+		{{/publisher}}
+		</script>		
+	</head>
+
+	<body>				
+		<script>			
+
+			var ajaxCount = {
+				total : 0,
+				count : 0
+			}
+		
+			function init(){					
+				addCheckBoxes(JournalListHandler.publishers, $('#pubChkContainer'));	
+			}
+
+			function addCheckBoxes(categories, container){
+				$.each(categories, function(i, cat){	
+					$(container).append($('<input>', {id : cat+"Chk", type : "checkbox", name : cat+"Chk", value : cat}));		
+					$(container).append($("<label>", {for : cat+"Chk"}).text(cat));					
+					$(container).append("<br>");
+				});
+			}
+
+			function getChkValues(containerId){
+				var vals = [];
+				$('#' + containerId + " :checked").each(function(){
+					vals.push($(this).val());
+				});
+				return vals;
+			}
+
+			$(document).ready(function(){
+				init();				
+				var articleList;
+
+				$(document).ajaxStart(function(){
+					$('#spinner').show();
+					$('#spinnerText').show();		
+				});
+
+				$(document).ajaxStop(function(){
+					$('#spinner').hide();
+					//$('#spinnerText').hide();
+				});
+
+				$(document).ajaxComplete(function(){
+					$('#spinnerText').text(ajaxCount.count + "/" + ajaxCount.total + " articles processed");
+				});
+
+				$(document).bind("ajaxError", function(e, jqXhr){
+					console.log("AjaxError");
+					console.log(jqXhr.url);
+					$('#errText').html("Error contacting Altmetric servers - displaying " + ajaxCount.count + "/" + ajaxCount.total + " articles we managed to retrieve")
+					apiComplete(tempList);
+					$(document).unbind('ajaxError');
+				});
+
+				$(document).on("click", ".toggleNext", function(e){		
+					$(this).next('ul').slideToggle();
+
+					$(this).toggleClass("toggleUp toggleDown")
+				});
+
+				$('#pubButton').click(function(){
+					resetPage();					
+					
+					var publishers = getChkValues('pubChkContainer');
+
+					if(publishers.length > 0){
+						getArticles(publishers, JournalListHandler.getPublisherIssns);
+					} else{
+						alert("Please select at least one publisher!");
+					}					
+				});		
+
+					
+			});
+
+			var tempList = {};
+			var issns = [];
+			var numQueries = 0;
+			var queryComplete = 0;
+
+			function resetPage(){
+				$('.chart').remove();
+				$('#spinnerText').empty();	
+				$('#topArticles').empty();
+				$('#summary').empty();
+				tempList = {};
+				numQueries = 0;
+				queryComplete = 0;
+				issns = [];
+
+				$('#jnlBreakdownSection').fadeOut(1000).css("display", "none");
+				$('#citedBySection').fadeOut(1000).css("display", "none");
+				$('#topArticlesSection').fadeOut(1000).css("display", "none");
+				$('#summarySection').fadeOut(1000).css("display", "none");
+			}		
+
+			function getArticles(selections, issnGetter){
+				
+				$.each(selections, function(i, selection){
+					issns.push(issnGetter(selection));
+				});
+						
+				//logConsoleGroup("Issns", issns);
+				
+				AmAPI.getArticlesByIssn(issns, apiIterator);
+			}
+
+			function apiIterator(data, page){			
+				tempList = data;							
+				ajaxCount.total = data.query.total;
+
+				numQueries = Math.ceil(ajaxCount.total/AmAPI.num_results);
+				if(numQueries == 1){
+					ajaxCount.count = data.results.length;								
+					apiComplete(data);
+				}
+				for(var i = 0; i < numQueries-1; i++){
+					AmAPI.getArticlesByIssn(issns, pushData, i+2);
+				}											
+			}
+
+			function pushData(data){
+				tempList.results = tempList.results.concat(data.results);		
+				ajaxCount.count = tempList.results.length;							
+				queryComplete++;
+				
+				if(queryComplete == numQueries-1){
+					apiComplete(tempList);
+				}
+			}
+
+			function apiComplete(data){					
+				
+				articleList = processArticles(data);
+				logConsoleGroup("Articles", articleList)					
+				var journalScores = calculateJournalScores(articleList);
+
+				logConsoleGroup("Journal Scores", journalScores);
+			
+				var summary = summarize(journalScores);
+
+				logConsoleGroup("Summary", summary);
+
+				$('#summary').html(Mustache.to_html($('#summaryTemplate').html(), {publisher: summary}));
+			
+				
+				jnlBreakdownChart(journalScores, "jnlBreakdownContainer");		
+				citedByChart(journalScores, "citedByContainer");
+			/*
+				plotChart(articleList, "chartContainer");
+				$('#chart').fadeIn(1000).css("display", "inline-block");
+				$('#chart').bind("click", function(){		
+					$('#chartContainer').fadeToggle(1000).css("display", "inline-block");											
+				});
+			*/		
+
+				//$('#jnlBreakdown').fadeIn(1000).css("display", "block");
+				$('#jnlBreakdownSection').fadeIn(1000).css("display", "inline-block");
+				$('#citedBySection').fadeIn(1000).css("display", "inline-block");
+				$('#topArticlesSection').fadeIn(1000).css("display", "inline-block");
+				$('#summarySection').fadeIn(1000).css("display", "inline-block");
+
+			/*
+				$('#jnlBreakdown').bind("click", function(){
+					$('#jnlBreakdownContainer').fadeToggle(1000).css("display", "inline-block");					
+				})
+			*/
+
+				$('#exportCsvButton').fadeIn(1000).css("display", "block");
+				$('#exportCsvButton').bind("click", function(){
+					exportCsv(journalScores);
+				})
+				var template = $('#topArtTemplate').html()
+				//console.log(Mustache.to_html(template, journalScores))
+				$('#topArticles').append(Mustache.to_html(template, {publisher : journalScores}));				
+			}
+
+			function exportCsv(journalScores){
+				var headings = [
+					'Journal Name',
+					'Publisher',
+					'Subject Category',
+					'Average Score Week',
+					'Average Score Month',
+					'Average Score Quarter',
+					'Average Score Year',
+					'Article Count Week',
+					'Article Count Month',
+					'Article Count Quarter',
+					'Article Count Year',					
+				];
+
+				$.each(AmAPI.cited_by_alias, function(i, j){
+					headings.push(j.toString() + " last year");
+				});
+				
+				$.each(['week', 'month', 'quarter', 'year'], function(i, timescale){
+					for(var j = 1; j < 6; j++){
+						headings.push("Number " + j + " article last " + timescale);
+					}					
+				});
+
+				var csvFile = headings.join() + "\n";
+	
+				$.each(journalScores, function(i, pbl){
+					if(pbl.publisher != "unknown"){
+						$.each(pbl.journals, function(k, j){
+							csvFile += 	j.journal.Journal + "," +
+								j.journal.Publisher + "," +
+								j.journal['Subject Category'] + "," +
+								j.averageScore.week + "," +
+								j.averageScore.month + "," + 
+								j.averageScore.quarter + "," +
+								j.averageScore.year + "," +
+								j.articleCount.week + "," +
+								j.articleCount.month + "," +
+								j.articleCount.quarter + "," +
+								j.articleCount.year + ",";
+								$.each(j.citedBy, function(source, val){
+									csvFile += val + ",";
+								})								
+								$.each(j.topArticles, function(x, topArts){
+									$.each(topArts, function(y, topArt){										
+										csvFile += topArt.url + ",";	
+									});									
+								});
+								csvFile += "\n";								
+						});										
+					}
+				});
+
+				var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+		        if (navigator.msSaveBlob) { // IE 10+
+		            navigator.msSaveBlob(blob, filename);
+		        } else {
+		            var link = document.createElement("a");
+		            if (link.download !== undefined) { // feature detection
+		                // Browsers that support HTML5 download attribute
+		                var url = URL.createObjectURL(blob);
+		                link.setAttribute("href", url);
+		                link.setAttribute("download", "Altmetrics export " + $.datepicker.formatDate('yy-mm-dd', new Date()) + ".csv");
+		                link.style = "visibility:hidden";
+		                document.body.appendChild(link);
+		                link.click();
+		                document.body.removeChild(link);
+		            }
+		        }
+			}
+			
+			function calculateJournalScores(data){				
+				var jnls = [];						
+				
+				$.each(data.results, function(i, article){
+					var exists = false;
+
+					$.each(jnls, function(j, journal){
+						if(journal.journal.Journal == article.journal.Journal){
+							exists = true;							
+						}						
+					});
+
+					if(!exists){
+						jnls.push({
+							journal : article.journal,
+							totalScore : $.extend(true, {}, AmAPI.zeroTimescales),
+							averageScore : $.extend(true, {}, AmAPI.zeroTimescales),
+							articleCount : $.extend(true, {}, AmAPI.zeroTimescales),
+							citedBy : (function(keys){
+								var obj = {};
+								$.each(keys, function(j, key){
+									obj[key] = 0;
+								})
+								return obj;
+							})(Object.keys(AmAPI.cited_by_alias)),	
+							articles : [],	
+							topArticles : {'1w' : [], '1m' : [], '3m' : [], '1y' : []},							
+						});
+					}
+
+					$.each(jnls, function(j, journal){
+						if(journal.journal.Journal == article.journal.Journal){
+							journal.articles.push(article);
+							journal.totalScore.week += article.history['1w'];
+							journal.totalScore.month += article.history['1m'];
+							journal.totalScore.quarter += article.history['3m'];
+							journal.totalScore.year += article.history['1y'];
+							if(article.history['1w'] > 0) journal.articleCount.week++;							
+							if(article.history['1m'] > 0) journal.articleCount.month++;	
+							if(article.history['3m'] > 0) journal.articleCount.quarter++;						
+							if(article.history['1y'] > 0) journal.articleCount.year++;		
+
+							$.each(journal.citedBy, function(source, number){
+								if(article['cited_by_'+source+'_count'] != null){
+									journal.citedBy[source] += article['cited_by_'+source+'_count'];
+								}	
+							});						
+						}
+					});
+				})			
+
+				//sort journals by publisher
+				var publs = [];
+				$.each(jnls, function(i, journal){
+
+					$.each(journal.averageScore, function(timescale, score){
+						journal.averageScore[timescale] = (journal.articleCount[timescale] != 0)  ? parseFloat((journal.totalScore[timescale]/journal.articleCount[timescale]).toFixed(2)) : 0;
+					});
+
+					$.each(journal.citedBy, function(source, number){
+						journal.citedBy[source] = (journal.articleCount.year != 0) ? parseFloat((number/journal.articleCount.year).toFixed(2)) : 0;
+					});	
+
+					$.each(journal.topArticles, function(timescale, topArts){
+						journal.articles.sort(function (a, b){
+							if(a.history[timescale] < b.history[timescale]) return 1;
+							if(a.history[timescale] > b.history[timescale]) return -1;
+							return 0;
+						});	
+
+						journal.topArticles[timescale] = journal.articles.slice(0,5);
+					});
+
+					journal.articles.sort(function (a, b){
+						if(a.journal.Journal < b.journal.Journal) return 1;
+						if(a.journal.Journal > b.journal.Journal) return -1;
+						return 0;
+					});
+
+					var exists = false;
+					$.each(publs, function(j, publ){
+						if(journal.journal.Publisher == publ.publisher){
+							exists = true;
+						}
+					});
+
+					if(!exists){
+						publs.push({
+							publisher : journal.journal.Publisher,
+							journals : [],
+						})
+					}
+					$.each(publs, function(j, publ){	
+						if(journal.journal.Publisher == publ.publisher){
+							publ.journals.push(journal);
+						}
+					});
+				});		
+				
+				var finalList = [];
+				$.each(publs, function(i, publ){					
+
+					publ.topArticles = {'1w' : [], '1m' : [], '3m' : [], '1y' : []};
+					publ.articles = [];
+					$.each(publ.journals, function(j, jnl){	
+
+						$.each(jnl.articles, function(k, art){
+							publ.articles.push(art);						
+						});						
+					});
+
+					$.each(publ.topArticles, function(timescale, topArts){
+						publ.articles.sort(function (a, b){
+							if(a.history[timescale] < b.history[timescale]) return 1;
+							if(a.history[timescale] > b.history[timescale]) return -1;
+							return 0;
+						});	
+
+						publ.topArticles[timescale] = publ.articles.slice(0,5)
+
+					});
+					delete publ.articles;
+
+					if(publ.publisher != "unknown"){
+						finalList.push(publ);
+					}
+				});
+
+				return finalList;
+			};
+
+			function logConsoleGroup(name, content){
+				console.group(name);
+				console.log(content);
+				console.groupEnd();
+			}
+
+			function summarize(d){
+				var s = [];	
+				
+				$.each(d, function(i, publ){
+					var pubSummary = {
+						publisher: publ.publisher,
+						averageScore : $.extend(true, {}, AmAPI.zeroTimescales),
+					};
+
+				
+					$.each(publ.journals, function(j, journal){
+
+						$.each(journal.averageScore, function(timeframe, score){
+							pubSummary.averageScore[timeframe] += score;							
+						});
+					})
+
+					$.each(pubSummary.averageScore, function(timeframe, score){
+						pubSummary.averageScore[timeframe] /= publ.journals.length;
+						pubSummary.averageScore[timeframe] = parseFloat(pubSummary.averageScore[timeframe].toFixed(2));
+					});
+
+					s.push(pubSummary);
+				})
+				return s;
+			}
+
+			//assign journal objects to the articles
+			function processArticles(apiResult){
+				console.groupCollapsed("Journals not found for articles:");
+				$.each(apiResult.results, function(i, article){
+				
+					if(article.issns == null || article.issns.length == 0 || !("issns" in article)){
+						//console.log("checking by nlmid")
+						article.journal = JournalListHandler.getJournalByNlmid(article.nlmid);
+						
+					} else{
+						article.journal = JournalListHandler.getJournalByIssn(article.issns);	
+					}	
+
+					if($.isEmptyObject(article.journal)){							
+						article.journal = JournalListHandler.unknown;
+						//console.log(article);
+					}			
+				});
+				console.groupEnd()
+				return apiResult;
+			}			
+		</script>
+
+		<div class='header'>
+			<img class='logo' src='http://www.rsc.org/public/img/template/rsc-logo.jpg'>
+			<h1>Altmetrics Dashboard</h1>
+		</div>		
+		<section>
+			<form id='control'>		
+				<div id='pubControl'>			
+					<div id='pubChkContainer' class='chkContainer'></div>
+					<span id='pubButton' class='button center' style='display:block'>Analyse by Publisher</span>
+				</div>						
+			</form>
+			
+			<div id='spinnerText' hidden></div>	
+			<div id='errText' class='errText'></div>
+			<div id='spinner' class="spinner" hidden>	
+			
+				<div class="rect1"></div>
+				<div class="rect2"></div>
+			  	<div class="rect3"></div>
+			  	<div class="rect4"></div>
+			  	<div class="rect5"></div>
+			</div>			
+			<div>
+				<a id='exportCsvButton' class='button center' hidden>Export to CSV</a>
+			</div>			
+		</section>
+		<section id='summarySection' hidden>
+			<h3>Summary</h3>
+			<div id='summary' class='summary'></div>
+		</section>
+		<section id='topArticlesSection' hidden>
+			<h3>Top Articles</h3>
+			<div id='topArticles' class='topArticles'>				
+			</div>
+		</section>
+
+		<section id='citedBySection' hidden>
+			<h3>Average number of mentions from various sources in the last year</h3>
+			<div id='citedByContainer' class='graph'>				
+			</div>
+		</section>
+		
+		<section id='jnlBreakdownSection' hidden>
+			<h3>Average Altmetric Scores by journal</h3>			
+			<div id='jnlBreakdownContainer' class='graph'>			
+			</div>					
+		</section>
+	</body>
+</html>

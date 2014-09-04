@@ -1,0 +1,262 @@
+@font-face {
+    font-family: museo;
+    src: url(museosans-300-webfont.ttf);
+}
+
+body {
+	font-family : museo;
+}
+
+section{
+	margin: 20px 0px;
+	width: 100%;
+}
+
+section h3{
+	text-align: center;
+}
+h1 {
+	margin: auto 5px;
+ 	text-align: center;
+ 	padding-left: 10px
+
+}
+
+svg {
+	display: block;
+}
+.header {
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	justify-content: center;
+	width: 100%;
+}
+
+.logo{
+	height: 100px;
+	//flex-grow: 1;
+}
+
+.button{
+	background-color:  #006BA6;
+	padding: 10px 20px 10px 20px ;
+	margin: 12px 24px 12px 24px;
+	color: white;
+	cursor: pointer;
+}
+
+.button:hover{
+	 background-color: #5BC2E7
+;
+	 color: black;
+}
+
+.button:active{
+	background-color:  #94B7BB;
+}
+
+.half{
+	width: 48%;	
+}
+
+.chkContainer{
+	margin: 0 auto;
+	width: 120px;
+}
+
+.center{
+	margin: 5px auto;
+	width: 250px;
+	text-align: center
+}
+
+input[type='checkbox']{	
+	margin: 5px;
+}
+
+label{	
+	margin: 5px;
+}
+
+.graph{
+	text-align: center;
+	width:100%;	
+	margin: 0px auto;
+}
+
+#spinnerText{
+	width:100%;
+	text-align: center;
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
+
+.tooltip{
+	position: absolute;
+	z-index: 10;
+	visibility: hidden;
+	border-radius: 10px;
+	background-color: #E31C79;
+	padding: 3px;	
+}
+
+.topArticle a{
+	margin: 2px 5px;
+	text-decoration: none;
+	color: #2c4d67;
+}
+
+.topArticle a:hover{
+	text-decoration: underline;
+	color: #0D68A5;
+}
+
+.topArticle img{
+	min-height: 64px;
+    min-width: 64px;
+	margin: 2px;
+	opacity: 0.8;
+}
+
+.topArticle img:hover{
+	opacity:1;
+}
+
+
+.toggleNext{
+	color: #2c4d67;
+	cursor: pointer;
+}
+
+.toggleNext:hover{
+	color: #0D68A5;	
+}
+
+.toggleDown:hover::after{
+	content: "\2193";
+}
+
+.toggleDown:hover::before{
+	content: "\2193";
+}
+
+.toggleUp:hover::after{
+	content: "\2191";
+}
+
+.toggleUp:hover::before{
+	content: "\2191";
+}
+
+.topArticles{	
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	justify-content: space-around;
+	margin: 0px auto;
+	width: 100%;
+	flex-wrap: wrap;
+	-moz-flex-flow : row wrap;
+	-ms-flex-flow : row wrap;
+}
+
+.topArticles h3,h4{	
+	width: 100%;
+	margin: 5px auto;
+	text-align:center;	
+}
+
+.topArticle {
+	width: 90%;
+	list-style-type: none;
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	align-items:center;
+	padding: 20px 5px;
+}
+
+.publisherName{
+	color: #fff;
+	background-color: #4F758B;
+	margin: 20px 0 20px 0;
+	font-size: 140%
+}
+
+.publisherTopArts{
+	text-align: center;
+	margin: 20px 0;
+
+	display: flex;
+	display: -moz-box;
+	display: -ms-flexbox;
+	
+	justify-content: space-around;
+	margin: 0px auto;
+	width: 100%;
+	flex-wrap: wrap;
+	-moz-flex-flow : row wrap;
+	-ms-flex-flow : row wrap;
+	align-items: stretch;
+	-moz-box-orient: vertical;
+	-moz-box-align: start;
+
+}
+
+.jnlName{
+	font-size: 110%;
+	font-weight:normal;
+	color: #BE4D00;
+}
+
+.jnlTopArts{
+	display: inline-block;
+	flex-grow: 1;
+	flex-shrink: 1;
+	width: 30%;
+
+}
+
+.altmetricImg{
+	display: inline-block;
+}
+
+.articleInfo{
+	width: 100%;
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	flex-direction: column;
+	justify-content: space around;
+}
+
+.subInfo{
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	flex-direction: row;
+	justify-content: space-around;
+	font-size: 90%;
+	text-align: center;
+}
+
+.articleUrl{
+	text-align: center;
+	font-size: 120%;
+}
+
+
+
+.errText{
+	text-align: center;
+	color: red;
+}
+
+.summary{
+	display: -moz-box;
+	display: -ms-flexbox;
+	display: flex;
+	justify-content: space-around;
+	width: 100%;
+}
