@@ -1090,5 +1090,23 @@ var JournalList = [
     "nlm_id":"101601114",
     "issn_print":"2050-7526",
     "issn_web":"2050-7534"
+  },
+  {
+    "Journal full name":"Nanoscale Horizons",
+    "Subject Category":"Materials",
+    "Journal":"NANOSCALE HORIZ",
+    "Publisher":"RSC",
+    "nlm_id":"",
+    "issn_print":"2055-6756",
+    "issn_web":"2055-6764"
+  },
+  {
+    "Journal full name":"Materials Horizons",
+    "Subject Category":"Materials",
+    "Journal":"MATER HORIZ",
+    "Publisher":"RSC",
+    "nlm_id":"",
+    "issn_print":"2051-6347",
+    "issn_web":"2051-6355"
   }
 ]
