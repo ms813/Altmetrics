@@ -32,17 +32,14 @@ var AmAPI = {
 			page = 1;
 		}
 
+		//If no API key is provided then ask for data in smaller chunks
+		//Struggles if there are more than 100 pages of results
 		if (AmAPI.key === ""){
 			AmAPI.num_results = "100"
-		}
-		var testCB = function(d){console.log("testCB"); console.log(d);}
+		}	
 
 		var url = AmAPI.root + "citations/"+ AmAPI.timeframe +"?num_results=" + AmAPI.num_results+ "&key=" + AmAPI.key + "&issns=" + issns.join() + "&order_by=" + AmAPI.order_by + "&page=" + page;
-
-		var internal_cb = function(data){			
-			callback(data, page);
-		}
-	
+		
 		var ajaxRequest = $.ajax({
 			global : true,
 			url : url,
@@ -52,20 +49,20 @@ var AmAPI = {
 		});
 
 		ajaxRequest.done(function(data){						
-			internal_cb(data);
+			callback(data, page);
 		});
 		ajaxRequest.fail(function(jqXhr){
 			console.log("Ajax Error")			
-			console.log(jqXhr)
+			console.log(jqXhr);
 		});		
 	},
 
 	zeroTimescales : {
-						week : 0,
-						month : 0,
-						quarter : 0,
-						year : 0,
-					}
+		week : 0,
+		month : 0,
+		quarter : 0,
+		year : 0,
+	}
 }
 
 $.ajaxSetup({	
@@ -74,6 +71,7 @@ $.ajaxSetup({
     }
 });
 
+//Add this prefilter so that global ajax events are fired on jsonp requests
 $.ajaxPrefilter(function( options ) {
     options.global = true;
 });
