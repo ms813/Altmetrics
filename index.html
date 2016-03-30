@@ -19,7 +19,7 @@
 	    </style>
 
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>	
-		<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>	
+		<!--<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>	-->
 		<script src="http://d3js.org/d3.v3.min.js"></script>	
 		<script src='JournalList.js'></script>
 		<script src='JournalListHandler.js'></script>
@@ -28,6 +28,7 @@
 		<script src='CitedByChart.js'></script>
 		<script src="lib/mustache.js"></script>
 		<script id="topArtTemplate" type='text/html'>
+			{{!mustache template that prints each journal and its top articles}}
 			{{#publisher}}
 			<div class='publisherTopArts'>
 				<h3 class='publisherName'>{{publisher}}</h3>
@@ -104,6 +105,7 @@
 		</script>
 
 		<script id='summaryTemplate' type='text/html'>
+		{{!mustache template for the publisher summary}}
 		{{#publisher}}
 			<span>
 				<h4 class='publisherName'>{{publisher}}</h4>
@@ -120,14 +122,17 @@
 		<script>			
 
 			var ajaxCount = {
-				total : 0,
-				count : 0
-			}
-		
-			function init(){					
-				addCheckBoxes(JournalListHandler.publishers, $('#pubChkContainer'));	
-			}
+				total : 0,	//total articles across in current request bundle
+				count : 0,	//current number of articles received this bundle
+				error : 0,	//number of requests failed this bundle
+			}		
 
+			var tempList = {};
+			var issns = [];
+			var numQueries = 0;
+			var queryComplete = 0;	
+
+			//add a checkbox for each of the publishers of interest
 			function addCheckBoxes(categories, container){
 				$.each(categories, function(i, cat){	
 					$(container).append($('<input>', {id : cat+"Chk", type : "checkbox", name : cat+"Chk", value : cat}));		
@@ -136,6 +141,7 @@
 				});
 			}
 
+			//return an array of which publishers are selected
 			function getChkValues(containerId){
 				var vals = [];
 				$('#' + containerId + " :checked").each(function(){
@@ -145,64 +151,64 @@
 			}
 
 			$(document).ready(function(){
-				init();				
-				var articleList;
-
+				//add the checkboxes
+				addCheckBoxes(JournalListHandler.publishers, $('#pubChkContainer'));
+				
+				//show the loading ticker when ajax requests start
 				$(document).ajaxStart(function(){
 					$('#spinner').show();
 					$('#spinnerText').show();							
 				});
 
+				//hide the spinner when ajax requests end
 				$(document).ajaxStop(function(){
-					$('#spinner').hide();
-					//$('#spinnerText').hide();
+					$('#spinner').hide();				
 				});
 
+				//when all ajax requests are complete move on to the analysis
 				$(document).ajaxComplete(function(jqXhr, status){							
-					$('#spinnerText').text(ajaxCount.count + "/" + ajaxCount.total + " articles processed");
 
-					//if there are no errors then move on to calculating the graphs etc
-					if (ajaxErrorCount === 0){
-						if (ajaxCount.count / ajaxCount.total === 1){
-							apiComplete(tempList)
-						}
-					} else{
-						if ((ajaxErrorCount * AmAPI.num_results + ajaxCount.count)  / ajaxCount.total === 1){
-							apiComplete(tempList)
+					//update the request status text
+					$('#spinnerText').text(ajaxCount.count + "/" + ajaxCount.total + " articles processed");
+					
+					if (ajaxCount.error > 0){
+						var x = (ajaxCount.error * AmAPI.num_results + ajaxCount.count)  / ajaxCount.total;
+						
+						if (x === 1){													
+							apiComplete(tempList);
 						}
 					}
 				});
 
+				//bind an ajax error handler to keep track of the number of failed ajax requests
 				$(document).bind("ajaxError", function(e, jqXhr){					
-					ajaxErrorCount++;	
-					$('#errText').html("Up to " + ajaxErrorCount * AmAPI.num_results + " articles have been excluded due to an error contacting the Altmetrics Servers")										
+					ajaxCount.error++;	
+					$('#errText').html("Up to " + ajaxCount.error * AmAPI.num_results + " articles have been excluded due to an error contacting the Altmetrics Servers");										
 				});
 
+				//bind an on click handler to toggle the journal summaries 
 				$(document).on("click", ".toggleNext", function(e){		
 					$(this).next('ul').slideToggle();
-
-					$(this).toggleClass("toggleUp toggleDown")
+					$(this).toggleClass("toggleUp toggleDown");
 				});
 
+				//when the main button is clicked 
 				$('#pubButton').click(function(){
 					resetPage();					
 					
+					//grab the publishers selected from the checkboxes
 					var publishers = getChkValues('pubChkContainer');
 
 					if(publishers.length > 0){
+						//start the chain of async ajax requests
 						getArticles(publishers, JournalListHandler.getPublisherIssns);
 					} else{
 						alert("Please select at least one publisher!");
 					}					
 				});					
-			});
-
-			var tempList = {};
-			var issns = [];
-			var numQueries = 0;
-			var queryComplete = 0;
-			var ajaxErrorCount = 0;
+			});		
 			
+			//function that clears the page ready for a new search
 			function resetPage(){
 				$('.chart').remove();
 				$('#spinnerText').empty();	
@@ -221,85 +227,117 @@
 				$('#summarySection').fadeOut(1000).css("display", "none");
 			}		
 
+			/*
+				params:
+					selections 	– array of publisher name strings
+					issnGetter - function to get ISSNs from journal list
+			*/
 			function getArticles(selections, issnGetter){
-				
+
+				//get a list of ISSNs for each journal for each selected publisher
 				$.each(selections, function(i, selection){
 					issns.push(issnGetter(selection));
-				});
-						
-				//logConsoleGroup("Issns", issns);
+				});					
 				
+				//send an AJAX request for the listed ISSNs
 				AmAPI.getArticlesByIssn(issns, apiIterator);
 			}
 
-			function apiIterator(data, page){			
-				tempList = data;							
+			/*
+				Callback function used first time to initialise lists for receiving incoming data
+
+				params:
+					data	– growing list array of raw objects returned from API
+			*/
+			function apiIterator(data){		
+				//cache the results of the first request	
+				tempList = data;						
+
+				//set total incoming article count	
 				ajaxCount.total = data.query.total;
 
+				//round up to get max number of AJAX requests required
 				numQueries = Math.ceil(ajaxCount.total/AmAPI.num_results);
+
+				//if there is only 1 query, move on to analysis
 				if(numQueries == 1){
 					ajaxCount.count = data.results.length;								
-					apiComplete(data);
+					apiComplete(data);					
 				}
+
+				//issue async requests for the rest of the articles
 				for(var i = 0; i < numQueries-1; i++){
 					AmAPI.getArticlesByIssn(issns, pushData, i+2);
 				}											
 			}
 
+			/*
+				Callback function used iteratively to append the incoming data from the API
+
+				params:
+					data	– growing list array of raw objects returned from API
+			*/
 			function pushData(data){
 				tempList.results = tempList.results.concat(data.results);		
 				ajaxCount.count = tempList.results.length;							
 				queryComplete++;
 				
 				if(queryComplete == numQueries-1){
-					apiComplete(tempList);
+					apiComplete(tempList);				
 				}
 			}
 
-			function apiComplete(data){									
-				articleList = processArticles(data);
-				logConsoleGroup("Articles", articleList)					
+			/*
+				Called when the last AJAX call has completed
+
+				params:
+					data	– complete list array of raw objects returned from API
+			*/
+			function apiComplete(data){	
+
+				//process the raw list into an easier to wield form							
+				var articleList = processArticles(data);
+				logConsoleGroup("Articles", articleList);			
+
+				//calculate top and average scores for each journal	
+				//these are also used for the graphs	
 				var journalScores = calculateJournalScores(articleList);
-
 				logConsoleGroup("Journal Scores", journalScores);
-			
-				var summary = summarize(journalScores);
 
+				//calculate a summary for each publisher
+				var summary = summarize(journalScores);
 				logConsoleGroup("Summary", summary);
 
-				$('#summary').html(Mustache.to_html($('#summaryTemplate').html(), {publisher: summary}));
-			
+				//print the summary to the document using mustache
+				$('#summary').html(Mustache.to_html($('#summaryTemplate').html(), {publisher: summary}));			
 				
+				//create and display the charts
 				jnlBreakdownChart(journalScores, "jnlBreakdownContainer");		
-				citedByChart(journalScores, "citedByContainer");
-			/*
-				plotChart(articleList, "chartContainer");
-				$('#chart').fadeIn(1000).css("display", "inline-block");
-				$('#chart').bind("click", function(){		
-					$('#chartContainer').fadeToggle(1000).css("display", "inline-block");											
-				});
-			*/		
+				citedByChart(journalScores, "citedByContainer");		
 
-				//$('#jnlBreakdown').fadeIn(1000).css("display", "block");
 				$('#jnlBreakdownSection').fadeIn(1000).css("display", "inline-block");
 				$('#citedBySection').fadeIn(1000).css("display", "inline-block");
 				$('#topArticlesSection').fadeIn(1000).css("display", "inline-block");
 				$('#summarySection').fadeIn(1000).css("display", "inline-block");
 
-			/*
-				$('#jnlBreakdown').bind("click", function(){
-					$('#jnlBreakdownContainer').fadeToggle(1000).css("display", "inline-block");					
-				})
-			*/
-
+				//display the 'Export to CSV' button and bind an on click event handler
 				$('#exportCsvButton').fadeIn(1000).css("display", "block");
 				$('#exportCsvButton').bind("click", function(){
 					exportCsv(journalScores);
 				})
-				var template = $('#topArtTemplate').html()
-				//console.log(Mustache.to_html(template, journalScores))
+
+				//print the individual journal scores to the document
+				var template = $('#topArtTemplate').html()				
 				$('#topArticles').append(Mustache.to_html(template, {publisher : journalScores}));				
 			}
+
+			/*
+				Repackage the data in a format suitable for CSV export
+				Export using a Blob
+
+				params:
+					journalScores 	- curated list of top articles and average scores for each journal as produced by the calculateJournalScores() function
+			*/
 
 			function exportCsv(journalScores){
 				var headings = [
@@ -316,18 +354,22 @@
 					'Article Count Year',					
 				];
 
+				//create row headings
 				$.each(AmAPI.cited_by_alias, function(i, j){
 					headings.push(j.toString() + " last year");
 				});
-				
+
+				//prepare list of top articles over each time period
 				$.each(['week', 'month', 'quarter', 'year'], function(i, timescale){
 					for(var j = 1; j < 6; j++){
 						headings.push("Number " + j + " article last " + timescale);
 					}					
 				});
 
+				//add the headings to the first row of the csv file
 				var csvFile = headings.join() + "\n";
-	
+				
+				//compose the actual comma separated data rows
 				$.each(journalScores, function(i, pbl){
 					if(pbl.publisher != "unknown"){
 						$.each(pbl.journals, function(k, j){
@@ -355,24 +397,35 @@
 					}
 				});
 
+				//make the blob available for download
 				var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
 		        if (navigator.msSaveBlob) { // IE 10+
 		            navigator.msSaveBlob(blob, filename);
-		        } else {
+		        } else {		        
 		            var link = document.createElement("a");
 		            if (link.download !== undefined) { // feature detection
 		                // Browsers that support HTML5 download attribute
 		                var url = URL.createObjectURL(blob);
 		                link.setAttribute("href", url);
+
+		                //create the file name including today's date
 		                link.setAttribute("download", "Altmetrics export " + $.datepicker.formatDate('yy-mm-dd', new Date()) + ".csv");
+		                
+		                //append a hidden link to allow user to download the file
 		                link.style = "visibility:hidden";
 		                document.body.appendChild(link);
+
+		                //emulate a click on the link to force download then remove the link
 		                link.click();
 		                document.body.removeChild(link);
 		            }
 		        }
 			}
 			
+			/*
+				Main analysis function.
+				Calculates publisher & journal averages, top articles etc
+			*/
 			function calculateJournalScores(data){				
 				var jnls = [];						
 				
@@ -504,12 +557,16 @@
 				return finalList;
 			};
 
+			//helper function that prints to the console with a fold
 			function logConsoleGroup(name, content){
 				console.group(name);
 				console.log(content);
 				console.groupEnd();
 			}
 
+			/*
+				Calculates the publisher summaries
+			*/
 			function summarize(d){
 				var s = [];	
 				
@@ -539,6 +596,7 @@
 
 			//assign journal objects to the articles
 			function processArticles(apiResult){
+				console.log(apiResult)
 				console.groupCollapsed("Journals not found for articles:");
 				$.each(apiResult.results, function(i, article){
 				
@@ -574,6 +632,7 @@
 			
 			<div id='spinnerText' hidden></div>	
 			<div id='errText' class='errText'></div>
+			<!--Ticker that appears while ajax requests are out-->
 			<div id='spinner' class="spinner" hidden>	
 			
 				<div class="rect1"></div>

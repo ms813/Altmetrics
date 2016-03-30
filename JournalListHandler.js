@@ -1,3 +1,7 @@
+/*
+  Helper functions to grab various lists from the raw list of journals
+*/
+
 var JournalListHandler = {
   getAllBySubjectCategory : function(){
     var categories = {};
@@ -33,6 +37,8 @@ var JournalListHandler = {
     return categories;    
   })(),
 
+  //get a list of ISSNs for the selected publisher
+  //by iterating over the list of journals and pulling out the print and web ISSNs
   getPublisherIssns : function(publisher){
     var issns = [];
 
@@ -120,6 +126,7 @@ var JournalListHandler = {
   }
 }
 
+//some constants for each publisher, used for graphs and lookups
 var PublisherConstants = {
 
     getColor : function(publisher){
