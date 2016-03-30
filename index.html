@@ -150,7 +150,7 @@
 
 				$(document).ajaxStart(function(){
 					$('#spinner').show();
-					$('#spinnerText').show();		
+					$('#spinnerText').show();							
 				});
 
 				$(document).ajaxStop(function(){
@@ -158,16 +158,24 @@
 					//$('#spinnerText').hide();
 				});
 
-				$(document).ajaxComplete(function(){
+				$(document).ajaxComplete(function(jqXhr, status){							
 					$('#spinnerText').text(ajaxCount.count + "/" + ajaxCount.total + " articles processed");
+
+					//if there are no errors then move on to calculating the graphs etc
+					if (ajaxErrorCount === 0){
+						if (ajaxCount.count / ajaxCount.total === 1){
+							apiComplete(tempList)
+						}
+					} else{
+						if ((ajaxErrorCount * AmAPI.num_results + ajaxCount.count)  / ajaxCount.total === 1){
+							apiComplete(tempList)
+						}
+					}
 				});
 
-				$(document).bind("ajaxError", function(e, jqXhr){
-					console.log("AjaxError");
-					console.log(jqXhr.url);
-					$('#errText').html("Error contacting Altmetric servers - displaying " + ajaxCount.count + "/" + ajaxCount.total + " articles we managed to retrieve")
-					apiComplete(tempList);
-					$(document).unbind('ajaxError');
+				$(document).bind("ajaxError", function(e, jqXhr){					
+					ajaxErrorCount++;	
+					$('#errText').html("Up to " + ajaxErrorCount * AmAPI.num_results + " articles have been excluded due to an error contacting the Altmetrics Servers")										
 				});
 
 				$(document).on("click", ".toggleNext", function(e){		
@@ -186,26 +194,27 @@
 					} else{
 						alert("Please select at least one publisher!");
 					}					
-				});		
-
-					
+				});					
 			});
 
 			var tempList = {};
 			var issns = [];
 			var numQueries = 0;
 			var queryComplete = 0;
-
+			var ajaxErrorCount = 0;
+			
 			function resetPage(){
 				$('.chart').remove();
 				$('#spinnerText').empty();	
 				$('#topArticles').empty();
 				$('#summary').empty();
+				$('#errText').empty();
 				tempList = {};
 				numQueries = 0;
 				queryComplete = 0;
 				issns = [];
 
+				$('#exportCsvButton').fadeOut(1000).css("display", "none");
 				$('#jnlBreakdownSection').fadeOut(1000).css("display", "none");
 				$('#citedBySection').fadeOut(1000).css("display", "none");
 				$('#topArticlesSection').fadeOut(1000).css("display", "none");
@@ -247,8 +256,7 @@
 				}
 			}
 
-			function apiComplete(data){					
-				
+			function apiComplete(data){									
 				articleList = processArticles(data);
 				logConsoleGroup("Articles", articleList)					
 				var journalScores = calculateJournalScores(articleList);

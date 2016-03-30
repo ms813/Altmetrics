@@ -1,7 +1,7 @@
 var AmAPI = {
 	root :  "http://www.altmetric.com/api/v1/",
 	type : "citations", //or "journals"
-	key : "e900514dbfd492278f6cec1f8a955bd3",			
+	key : "e900514dbfd492278f6cec1f8a955bd3",				
 	num_results : "500",
 	order_by : "score",
 	timeframe : "1y",	
@@ -32,15 +32,32 @@ var AmAPI = {
 			page = 1;
 		}
 
-		var url = AmAPI.root + "citations/"+ AmAPI.timeframe +"?num_results=" + AmAPI.num_results+ "&key=" + AmAPI.key + "&issns=" + issns.join() + "&order_by=" + AmAPI.order_by + "&page=" + page;		
+		if (AmAPI.key === ""){
+			AmAPI.num_results = "100"
+		}
+		var testCB = function(d){console.log("testCB"); console.log(d);}
 
-		$.getJSON(url).done(function(data){				
+		var url = AmAPI.root + "citations/"+ AmAPI.timeframe +"?num_results=" + AmAPI.num_results+ "&key=" + AmAPI.key + "&issns=" + issns.join() + "&order_by=" + AmAPI.order_by + "&page=" + page;
+
+		var internal_cb = function(data){			
 			callback(data, page);
-		})
-		.fail(function(jqXhr){
-			console.log(jqXhr.responseText)
+		}
+	
+		var ajaxRequest = $.ajax({
+			global : true,
+			url : url,
+			type : 'GET',		
+			contentType: "application/json; charset=utf-8",	
+			dataType : 'jsonp',									
 		});
 
+		ajaxRequest.done(function(data){						
+			internal_cb(data);
+		});
+		ajaxRequest.fail(function(jqXhr){
+			console.log("Ajax Error")			
+			console.log(jqXhr)
+		});		
 	},
 
 	zeroTimescales : {
@@ -51,8 +68,12 @@ var AmAPI = {
 					}
 }
 
-$.ajaxSetup({
+$.ajaxSetup({	
     beforeSend: function(jqXHR, settings) {
-        jqXHR.url = settings.url;
+        jqXHR.url = settings.url;        
     }
+});
+
+$.ajaxPrefilter(function( options ) {
+    options.global = true;
 });
